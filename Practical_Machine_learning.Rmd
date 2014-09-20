@@ -1,0 +1,210 @@
+---
+title: 'Practical Machine Learning Project: Prediction of Activity recognition of
+  Weight Lifting Exercises tracking systems'
+author: "Bhawna G. Panwar"
+date: "Friday, September 18, 2014"
+output:
+  html_document:
+    keep_md: yes
+    self_contained: no
+  pdf_document:
+    fig_crop: no
+    fig_height: 5
+---
+
+##SYNOPSIS: 
+
+The main objective of this report is to explore and evaluate the Jawbbone UP, Nike FuelBand, and Fitbit Database and predict the manner in which user's performed exercise sequences.  
+
+
+In order to predict the manner each user performed unilateral dumbell biceps curls based on data from accelerometers on the belt, forearms, arm, and dumbell of 6 participants.  There are five possible methods that are captured in this analysis as listed below:
+
+A: based on Specification
+B: pushing the elbows to the front position
+C: lifting the dumbell half the distance
+D: keeping the dumbell half the distance
+E: pushing hips to the front position
+
+
+Model was built on the following criterions:  
+
+Crossvalidation  was used to evaluate the built model. To ensure the accuracy was close to 100%. It is noted that the dependent variable or response is known to be "classe" variable in the training set. Accuracy was used to select the optimal model using the largest value. The final value used for the model was mtry = 27.
+
+Evaluation of the Prediction model tested 20 cases succesfully.
+
+
+
+
+
+## PROCESSING DATA and LOADING LIBRARIES
+```{r part0, echo=TRUE, message=FALSE}
+         
+        library(caret)
+        ## Use to allow text to override the default wrapping width.
+        options(width=120)
+        library(knitr)
+        library(VIM)
+        library(randomForest)
+        ## Use to makes useful test and training tables
+        library(pander)
+        
+
+        setwd("~/practical machine learning/")
+
+                     
+```
+##DATAPROCESSING
+```{r part1, echo=TRUE, message=FALSE}
+    ## Process raw data 
+    training <- read.csv("pml-training.csv", na.strings=c("NA",""))
+    testing <- read.csv("pml-testing.csv", na.strings=c("NA",""))
+
+    dim(training)
+    #head(training)
+
+    dim(testing)
+    #head(testing)
+
+    training[1:5, c('user_name', 'classe', 'num_window', 'roll_belt', 'pitch_belt')]
+
+    sum(is.na(training))
+
+    t1 <- table(colSums(is.na(training)))
+    t2 <- table(colSums(is.na(testing)))
+
+    pandoc.table(t1, style ="grid", justify ='left', caption = 'Training data column NA frequencies')
+
+    pandoc.table(t2, style ="grid", justify ='left', caption = 'Testing data column NA frequencies')
+          
+          
+        
+```
+
+
+## Clean data for Training dataset
+```{r part2,echo=TRUE, message=FALSE}
+      ##Training
+
+    columnNACounts <- colSums(is.na(training))
+
+    tidy.Columns <- columnNACounts >=19000
+
+    tidy.training.data <- training[!tidy.Columns]
+
+    sum(is.na(tidy.training.data))
+
+    tidy.training.data <-tidy.training.data[, c(7:60)]
+
+
+
+```
+
+## Clean data for Testing dataset
+```{r part3, echo=TRUE, message=FALSE}
+      
+##Testing
+    columnNACounts <- colSums(is.na(testing))
+
+    tidy.Columns <- columnNACounts >=20
+
+    tidy.testing.data <- testing[!tidy.Columns]
+
+    sum(is.na(tidy.testing.data))
+
+    tidy.testing.data <-tidy.testing.data[, c(7:60)]
+
+
+        
+```
+##Visualization and Explore Dataset
+```{r part4, echo=TRUE, message=FALSE}
+  ##Explore data
+    s <- summary(tidy.training.data$classe)
+    pandoc.table(s, style ="grid", justify ='right', caption = 'Classe Frequencies')
+
+```
+
+
+##Plot Classe Frequency 
+```{r part5, echo=TRUE, message=FALSE}
+    ## plot(tidy.training.data$classe,col=rainbow(5),main ="classe frequency plot")
+    plot(tidy.training.data$classe,col=c("cyan","red","green3", "yellow", "blue"),main ="Classe Frequency plot")
+
+
+```
+
+
+##Data partitioning:Create cross validation set.  The training set divided into two parts: one for training and
+##the other for cross validation.
+
+```{r part6, echo=TRUE, message=FALSE}
+
+    partition <- createDataPartition(y= tidy.training.data$classe, p= .75, list = FALSE)
+
+    training.data <-tidy.training.data[partition, ]
+    testing.data <- tidy.training.data[-partition, ]
+```
+
+
+##model Bulding: Train model by applying random forest technique as it has the most accuracy rate.  
+```{r part7, echo=TRUE, message=FALSE}
+     
+    train.Inds <-sample(nrow(tidy.training.data), 3000)
+    training.data <- tidy.training.data[train.Inds, ]
+
+
+```
+
+##Build Model by using the the training set of variables from the initial value. Cross validation is used as train control method.
+##This was done to enhance the model's accuracy.
+
+```{r part8, echo=TRUE, message=FALSE}
+    ##Model uses trainingset of ##variables from the initial vlaue of ##. Cross Validation is used as train control method.
+    model <- train(classe ~ ., data=training.data, method = "rf", prox = TRUE, 
+                   trControl = trainControl(method = "cv", number =5, allowParallel=
+                                              TRUE))
+    model
+    ##model <- randomForest(formula = classe ~ ., data = training.data, importance = TRUE)
+    
+```
+
+##Confusion Matrix was used as it is the most accurate predictor.
+
+```{r part9, echo=TRUE, message=FALSE}
+    training_pred <- predict(model, training.data)
+    confusionMatrix(training_pred, training.data$classe)
+
+```
+
+###RESULTS: Predictive results on the testing sets.
+Sample accuracy
+```{r part10, echo=TRUE, message=FALSE}
+    ## sample accuracy
+    testing_pred <- predict(model, testing.data)
+    confusionMatrix(testing_pred, testing.data$classe)
+
+    answers <- predict(model, tidy.testing.data)
+    answers <- as.character(answers)
+    answers
+
+```
+
+
+###Part11: This portion of the code was provided by the course for preductive results submission.
+  
+```{r part11, echo=TRUE, message=FALSE}
+    pml_write_files = function(x){
+    n = length(x)
+    for(i in 1:n){
+       filename = paste0("problem_id_",i,".txt")
+        write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+    }
+
+   pml_write_files(answers)  
+          
+
+        
+```
+
+Note that the `echo = TRUE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

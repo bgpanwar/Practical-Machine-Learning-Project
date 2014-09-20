@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta name="generator" content="pandoc" />
+
+<meta name="author" content="Bhawna G. Panwar" />
+
+
+<title>Practical Machine Learning Project: Prediction of Activity recognition of Weight Lifting Exercises tracking systems</title>
+
+<script src="Practical_Machine_learning_files/jquery-1.11.0/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link href="Practical_Machine_learning_files/bootstrap-2.3.2/css/bootstrap.min.css" rel="stylesheet" />
+<link href="Practical_Machine_learning_files/bootstrap-2.3.2/css/bootstrap-responsive.min.css" rel="stylesheet" />
+<script src="Practical_Machine_learning_files/bootstrap-2.3.2/js/bootstrap.min.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<link rel="stylesheet"
+      href="Practical_Machine_learning_files/highlight/default.css"
+      type="text/css" />
+<script src="Practical_Machine_learning_files/highlight/highlight.js"></script>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+<div class="container-fluid main-container">
+
+
+<div id="header">
+<h1 class="title">Practical Machine Learning Project: Prediction of Activity recognition of Weight Lifting Exercises tracking systems</h1>
+<h4 class="author"><em>Bhawna G. Panwar</em></h4>
+<h4 class="date"><em>Friday, September 18, 2014</em></h4>
+</div>
+
+
+<div id="synopsis" class="section level2">
+<h2>SYNOPSIS:</h2>
+<p>The main objective of this report is to explore and evaluate the Jawbbone UP, Nike FuelBand, and Fitbit Database and predict the manner in which user’s performed exercise sequences.</p>
+<p>In order to predict the manner each user performed unilateral dumbell biceps curls based on data from accelerometers on the belt, forearms, arm, and dumbell of 6 participants. There are five possible methods that are captured in this analysis as listed below:</p>
+<p>A: based on Specification B: pushing the elbows to the front position C: lifting the dumbell half the distance D: keeping the dumbell half the distance E: pushing hips to the front position</p>
+<p>Model was built on the following criterions:</p>
+<p>Crossvalidation was used to evaluate the built model. To ensure the accuracy was close to 100%. It is noted that the dependent variable or response is known to be “classe” variable in the training set. Accuracy was used to select the optimal model using the largest value. The final value used for the model was mtry = 27.</p>
+<p>Evaluation of the Prediction model tested 20 cases succesfully.</p>
+</div>
+<div id="processing-data-and-loading-libraries" class="section level2">
+<h2>PROCESSING DATA and LOADING LIBRARIES</h2>
+<pre class="r"><code>        library(caret)</code></pre>
+<pre><code>## Warning: package &#39;caret&#39; was built under R version 3.1.1</code></pre>
+<pre class="r"><code>        ## Use to allow text to override the default wrapping width.
+        options(width=120)
+        library(knitr)</code></pre>
+<pre><code>## Warning: package &#39;knitr&#39; was built under R version 3.1.1</code></pre>
+<pre class="r"><code>        library(VIM)</code></pre>
+<pre><code>## Warning: package &#39;VIM&#39; was built under R version 3.1.1</code></pre>
+<pre class="r"><code>        library(randomForest)</code></pre>
+<pre><code>## Warning: package &#39;randomForest&#39; was built under R version 3.1.1</code></pre>
+<pre class="r"><code>        ## Use to makes useful test and training tables
+        library(pander)</code></pre>
+<pre><code>## Warning: package &#39;pander&#39; was built under R version 3.1.1</code></pre>
+<pre class="r"><code>        setwd(&quot;~/practical machine learning/&quot;)</code></pre>
+</div>
+<div id="dataprocessing" class="section level2">
+<h2>DATAPROCESSING</h2>
+<pre class="r"><code>    ## Process raw data 
+    training &lt;- read.csv(&quot;pml-training.csv&quot;, na.strings=c(&quot;NA&quot;,&quot;&quot;))
+    testing &lt;- read.csv(&quot;pml-testing.csv&quot;, na.strings=c(&quot;NA&quot;,&quot;&quot;))
+
+    dim(training)</code></pre>
+<pre><code>## [1] 19622   160</code></pre>
+<pre class="r"><code>    #head(training)
+
+    dim(testing)</code></pre>
+<pre><code>## [1]  20 160</code></pre>
+<pre class="r"><code>    #head(testing)
+
+    training[1:5, c(&#39;user_name&#39;, &#39;classe&#39;, &#39;num_window&#39;, &#39;roll_belt&#39;, &#39;pitch_belt&#39;)]</code></pre>
+<pre><code>##   user_name classe num_window roll_belt pitch_belt
+## 1  carlitos      A         11      1.41       8.07
+## 2  carlitos      A         11      1.41       8.07
+## 3  carlitos      A         11      1.42       8.07
+## 4  carlitos      A         12      1.48       8.05
+## 5  carlitos      A         12      1.48       8.07</code></pre>
+<pre class="r"><code>    sum(is.na(training))</code></pre>
+<pre><code>## [1] 1921600</code></pre>
+<pre class="r"><code>    t1 &lt;- table(colSums(is.na(training)))
+    t2 &lt;- table(colSums(is.na(testing)))
+
+    pandoc.table(t1, style =&quot;grid&quot;, justify =&#39;left&#39;, caption = &#39;Training data column NA frequencies&#39;)</code></pre>
+<pre><code>## 
+## 
+## +-----+---------+
+## | 0   | 19216   |
+## +=====+=========+
+## | 60  | 100     |
+## +-----+---------+
+## 
+## Table: Training data column NA frequencies</code></pre>
+<pre class="r"><code>    pandoc.table(t2, style =&quot;grid&quot;, justify =&#39;left&#39;, caption = &#39;Testing data column NA frequencies&#39;)</code></pre>
+<pre><code>## 
+## 
+## +-----+------+
+## | 0   | 20   |
+## +=====+======+
+## | 60  | 100  |
+## +-----+------+
+## 
+## Table: Testing data column NA frequencies</code></pre>
+</div>
+<div id="clean-data-for-training-dataset" class="section level2">
+<h2>Clean data for Training dataset</h2>
+<pre class="r"><code>      ##Training
+
+    columnNACounts &lt;- colSums(is.na(training))
+
+    tidy.Columns &lt;- columnNACounts &gt;=19000
+
+    tidy.training.data &lt;- training[!tidy.Columns]
+
+    sum(is.na(tidy.training.data))</code></pre>
+<pre><code>## [1] 0</code></pre>
+<pre class="r"><code>    tidy.training.data &lt;-tidy.training.data[, c(7:60)]</code></pre>
+</div>
+<div id="clean-data-for-testing-dataset" class="section level2">
+<h2>Clean data for Testing dataset</h2>
+<pre class="r"><code>##Testing
+    columnNACounts &lt;- colSums(is.na(testing))
+
+    tidy.Columns &lt;- columnNACounts &gt;=20
+
+    tidy.testing.data &lt;- testing[!tidy.Columns]
+
+    sum(is.na(tidy.testing.data))</code></pre>
+<pre><code>## [1] 0</code></pre>
+<pre class="r"><code>    tidy.testing.data &lt;-tidy.testing.data[, c(7:60)]</code></pre>
+</div>
+<div id="visualization-and-explore-dataset" class="section level2">
+<h2>Visualization and Explore Dataset</h2>
+<pre class="r"><code>  ##Explore data
+    s &lt;- summary(tidy.training.data$classe)
+    pandoc.table(s, style =&quot;grid&quot;, justify =&#39;right&#39;, caption = &#39;Classe Frequencies&#39;)</code></pre>
+<pre><code>## 
+## 
+## +------+------+------+------+------+
+## |    A |    B |    C |    D |    E |
+## +======+======+======+======+======+
+## | 5580 | 3797 | 3422 | 3216 | 3607 |
+## +------+------+------+------+------+
+## 
+## Table: Classe Frequencies</code></pre>
+</div>
+<div id="plot-classe-frequency" class="section level2">
+<h2>Plot Classe Frequency</h2>
+<pre class="r"><code>    ## plot(tidy.training.data$classe,col=rainbow(5),main =&quot;classe frequency plot&quot;)
+    plot(tidy.training.data$classe,col=c(&quot;cyan&quot;,&quot;red&quot;,&quot;green3&quot;, &quot;yellow&quot;, &quot;blue&quot;),main =&quot;Classe Frequency plot&quot;)</code></pre>
+<p><img src="Practical_Machine_learning_files/figure-html/part5.png" alt="plot of chunk part5" /></p>
+</div>
+<div id="data-partitioningcreate-cross-validation-set.-the-training-set-divided-into-two-parts-one-for-training-and" class="section level2">
+<h2>Data partitioning:Create cross validation set. The training set divided into two parts: one for training and</h2>
+</div>
+<div id="the-other-for-cross-validation." class="section level2">
+<h2>the other for cross validation.</h2>
+<pre class="r"><code>    partition &lt;- createDataPartition(y= tidy.training.data$classe, p= .75, list = FALSE)
+
+    training.data &lt;-tidy.training.data[partition, ]
+    testing.data &lt;- tidy.training.data[-partition, ]</code></pre>
+</div>
+<div id="model-bulding-train-model-by-applying-random-forest-technique-as-it-has-the-most-accuracy-rate." class="section level2">
+<h2>model Bulding: Train model by applying random forest technique as it has the most accuracy rate.</h2>
+<pre class="r"><code>    train.Inds &lt;-sample(nrow(tidy.training.data), 3000)
+    training.data &lt;- tidy.training.data[train.Inds, ]</code></pre>
+</div>
+<div id="build-model-by-using-the-the-training-set-of-variables-from-the-initial-value.-cross-validation-is-used-as-train-control-method." class="section level2">
+<h2>Build Model by using the the training set of variables from the initial value. Cross validation is used as train control method.</h2>
+</div>
+<div id="this-was-done-to-enhance-the-models-accuracy." class="section level2">
+<h2>This was done to enhance the model’s accuracy.</h2>
+<pre class="r"><code>    ##Model uses trainingset of ##variables from the initial vlaue of ##. Cross Validation is used as train control method.
+    model &lt;- train(classe ~ ., data=training.data, method = &quot;rf&quot;, prox = TRUE, 
+                   trControl = trainControl(method = &quot;cv&quot;, number =5, allowParallel=
+                                              TRUE))
+    model</code></pre>
+<pre><code>## Random Forest 
+## 
+## 3000 samples
+##   53 predictor
+##    5 classes: &#39;A&#39;, &#39;B&#39;, &#39;C&#39;, &#39;D&#39;, &#39;E&#39; 
+## 
+## No pre-processing
+## Resampling: Cross-Validated (5 fold) 
+## 
+## Summary of sample sizes: 2399, 2401, 2400, 2400, 2400 
+## 
+## Resampling results across tuning parameters:
+## 
+##   mtry  Accuracy  Kappa  Accuracy SD  Kappa SD
+##    2    1         1.0    0.008        0.010   
+##   27    1         1.0    0.007        0.008   
+##   53    1         0.9    0.007        0.009   
+## 
+## Accuracy was used to select the optimal model using  the largest value.
+## The final value used for the model was mtry = 27.</code></pre>
+<pre class="r"><code>    ##model &lt;- randomForest(formula = classe ~ ., data = training.data, importance = TRUE)</code></pre>
+</div>
+<div id="confusion-matrix-was-used-as-it-is-the-most-accurate-predictor." class="section level2">
+<h2>Confusion Matrix was used as it is the most accurate predictor.</h2>
+<pre class="r"><code>    training_pred &lt;- predict(model, training.data)
+    confusionMatrix(training_pred, training.data$classe)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction   A   B   C   D   E
+##          A 875   0   0   0   0
+##          B   0 626   0   0   0
+##          C   0   0 494   0   0
+##          D   0   0   0 478   0
+##          E   0   0   0   0 527
+## 
+## Overall Statistics
+##                                     
+##                Accuracy : 1         
+##                  95% CI : (0.999, 1)
+##     No Information Rate : 0.292     
+##     P-Value [Acc &gt; NIR] : &lt;2e-16    
+##                                     
+##                   Kappa : 1         
+##  Mcnemar&#39;s Test P-Value : NA        
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity             1.000    1.000    1.000    1.000    1.000
+## Specificity             1.000    1.000    1.000    1.000    1.000
+## Pos Pred Value          1.000    1.000    1.000    1.000    1.000
+## Neg Pred Value          1.000    1.000    1.000    1.000    1.000
+## Prevalence              0.292    0.209    0.165    0.159    0.176
+## Detection Rate          0.292    0.209    0.165    0.159    0.176
+## Detection Prevalence    0.292    0.209    0.165    0.159    0.176
+## Balanced Accuracy       1.000    1.000    1.000    1.000    1.000</code></pre>
+<div id="results-predictive-results-on-the-testing-sets." class="section level3">
+<h3>RESULTS: Predictive results on the testing sets.</h3>
+<p>Sample accuracy</p>
+<pre class="r"><code>    ## sample accuracy
+    testing_pred &lt;- predict(model, testing.data)
+    confusionMatrix(testing_pred, testing.data$classe)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1390   19    1    3    0
+##          B    0  915   18    0    6
+##          C    2   13  824   19    3
+##          D    1    1    6  782   22
+##          E    2    1    6    0  870
+## 
+## Overall Statistics
+##                                        
+##                Accuracy : 0.975        
+##                  95% CI : (0.97, 0.979)
+##     No Information Rate : 0.284        
+##     P-Value [Acc &gt; NIR] : &lt; 2e-16      
+##                                        
+##                   Kappa : 0.968        
+##  Mcnemar&#39;s Test P-Value : 1.09e-08     
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity             0.996    0.964    0.964    0.973    0.966
+## Specificity             0.993    0.994    0.991    0.993    0.998
+## Pos Pred Value          0.984    0.974    0.957    0.963    0.990
+## Neg Pred Value          0.999    0.991    0.992    0.995    0.992
+## Prevalence              0.284    0.194    0.174    0.164    0.184
+## Detection Rate          0.283    0.187    0.168    0.159    0.177
+## Detection Prevalence    0.288    0.191    0.176    0.166    0.179
+## Balanced Accuracy       0.995    0.979    0.977    0.983    0.982</code></pre>
+<pre class="r"><code>    answers &lt;- predict(model, tidy.testing.data)
+    answers &lt;- as.character(answers)
+    answers</code></pre>
+<pre><code>##  [1] &quot;B&quot; &quot;A&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;E&quot; &quot;D&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;B&quot; &quot;C&quot; &quot;B&quot; &quot;A&quot; &quot;E&quot; &quot;E&quot; &quot;A&quot; &quot;B&quot; &quot;B&quot; &quot;B&quot;</code></pre>
+</div>
+<div id="part11-this-portion-of-the-code-was-provided-by-the-course-for-preductive-results-submission." class="section level3">
+<h3>Part11: This portion of the code was provided by the course for preductive results submission.</h3>
+<pre class="r"><code>    pml_write_files = function(x){
+    n = length(x)
+    for(i in 1:n){
+       filename = paste0(&quot;problem_id_&quot;,i,&quot;.txt&quot;)
+        write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+    }
+
+   pml_write_files(answers)  </code></pre>
+<p>Note that the <code>echo = TRUE</code> parameter was added to the code chunk to prevent printing of the R code that generated the plot.</p>
+</div>
+</div>
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+$(document).ready(function () {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+});
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with --self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
